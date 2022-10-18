@@ -14,6 +14,85 @@ type Iterator struct {
 	Err    error
 }
 
+//nodeIteratorState stores the data pertinent to the iteration state
+//at one particular node in the trie
+type nodeIteratorState struct {
+	hash    []byte
+	node    []byte
+	parent  []byte
+	index   int
+	pathlen int
+}
+
+//nodeIterator stores the current position of the iterator in the trie
+type nodeIterator struct {
+	trie  *SparseMerkleTree
+	stack []*nodeIteratorState
+	path  []byte
+	err   error
+}
+
+func (n *nodeIterator) iterate([][]byte, []byte) [][]byte {
+	// Get tree's root
+	root := n.trie.Root()
+
+	if bytes.Equal(root, n.trie.th.placeholder()) {
+		// The tree is empty, return the default value.
+		return nil
+	}
+
+	currentHash := root
+	var key [][]byte
+	var value [][]byte
+	var tempKey [][]byte
+	var tempValue [][]byte
+	currentData, _ := n.trie.nodes.Get(currentHash)
+	tempValue = append(tempValue, currentData)
+	tempKey = append(tempKey, currentHash)
+	for len(tempKey) > 0 {
+
+		if err != nil {
+			return nil, err
+		} else if n.trie.th.isLeaf(currentData) {
+			// We've reached the end. Is this the actual leaf?
+			p, _ := n.trie.th.parseLeaf(currentData)
+			if !bytes.Equal(path, p) {
+				// Nope. Therefore the key is actually empty.
+				return defaultValue, nil
+			}
+			// Otherwise, yes. Return the value.
+			value, err := smt.values.Get(path)
+			if err != nil {
+				return nil, err
+			}
+			return value, nil
+		}
+
+		leftNode, rightNode := smt.th.parseNode(currentData)
+		if getBitAtFromMSB(path, i) == right {
+			currentHash = rightNode
+		} else {
+			currentHash = leftNode
+		}
+
+		if bytes.Equal(currentHash, smt.th.placeholder()) {
+			// We've hit a placeholder value; this is the end.
+			return defaultValue, nil
+		}
+	}
+	//if n.trie.th.isLeaf(currentData) {
+	//	// We've reached the end. Is this the actual leaf?
+	//	kvpair = append(kvpair, tempkvpair[len(tempkvpair)-1])
+	//	return kvpair
+	//} else{
+	//	leftNode, rightNode := n.trie.th.parseNode(currentData)
+	//	n.iterate(tempkvpair,leftNode)
+	//	n.iterate(tempkvpair,rightNode)
+	//
+	//}
+
+}
+
 //NewIterator creates a key-value iterator from a node iterator
 func NewIterator(it NodeIterator) *Iterator {
 	return &Iterator{
@@ -72,24 +151,6 @@ type NodeIterator interface {
 	LeafProof() [][]byte
 }
 
-//nodeIteratorState stores the data pertinent to the iteration state at one
-//at one particular node in the trie
-type nodeIteratorState struct {
-	hash    []byte
-	node    []byte
-	parent  []byte
-	index   int
-	pathlen int
-}
-
-//nodeIterator stores the current position of the iterator in the trie
-type nodeIterator struct {
-	trie  *SparseMerkleTree
-	stack []*nodeIteratorState
-	path  []byte
-	err   error
-}
-
 //func (it *nodeIterator) resolveBlob(hash []byte, path []byte) ([]byte, error) {
 //	if it.resolver != nil {
 //		if blob, err := it.resolver.Get(hash); err == nil && len(blob) > 0 {
@@ -117,6 +178,7 @@ func (n *nodeIterator) Hash() []byte {
 	return n.trie.th.digest(n.stack[len(n.stack)-1].node)
 }
 
+//Parent returns the hash value of the parent node
 func (n *nodeIterator) Parent() []byte {
 	if len(n.stack) == 0 {
 		return n.trie.th.placeholder()
@@ -125,14 +187,15 @@ func (n *nodeIterator) Parent() []byte {
 	return n.trie.th.digest(n.stack[len(n.stack)-1].parent)
 }
 
+//Path returns the path to the nodeIterator
 func (n *nodeIterator) Path() []byte {
 	return n.path
 }
 
 func (n nodeIterator) NodeBlob() []byte {
-	//if bytes.Compare(n.Hash(), n.trie.th.placeholder()) == 0 {
-	//	return nil
-	//}
+	if bytes.Compare(n.Hash(), n.trie.th.placeholder()) == 0 {
+		return nil
+	}
 	//blob, err := n.resolveBlob(n.Hash(), it.Path())
 	//if err != nil {
 	//	it.err = err
@@ -191,96 +254,69 @@ func (e seekError) Error() string {
 	return "seek error: " + e.err.Error()
 }
 
-// Next moves the iterator to the next node, returning whether there are any
-// further nodes. In case of an internal error this method returns false and
-// sets the Error field to the encountered failure. If `descend` is false,
-// skips iterating over any subnodes of the current node.
-func (n *nodeIterator) Next(descend bool) bool {
-	if n.err == errIteratorEnd {
-		return false
-	}
-	if seek, ok := n.err.(seekError); ok {
-		if n.err = n.seek(seek.key); n.err != nil {
-			return false
-		}
-	}
-	// Otherwise step forward with the iterator and report any errors.
-	state, parentIndex, path, err := n.peek(descend)
-	n.err = err
-	if n.err != nil {
-		return false
-	}
-	n.push(state, parentIndex, path)
-	return true
-}
+//Next moves the iterator to the next node, returning whether there are any
+//further nodes. In case of an internal error this method returns false and
+//sets the Error field to the encountered failure. If `descend` is false,
+//skips iterating over any subnodes of the current node.
+
+//TO DO AFTER PEEK
+//
+//func (n *nodeIterator) Next(descend bool) bool {
+//	if n.err == errIteratorEnd {
+//		return false
+//	}
+//	if seek, ok := n.err.(seekError); ok {
+//		if n.err = n.seek(seek.key); n.err != nil {
+//			return false
+//		}
+//	}
+//	// Otherwise step forward with the iterator and report any errors.
+//	state, parentIndex, path, err := n.peek(descend)
+//	n.err = err
+//	if n.err != nil {
+//		return false
+//	}
+//	n.push(state, parentIndex, path)
+//	return true
+//}
 
 // init initializes the iterator.
-func (it *nodeIterator) init() *nodeIteratorState {
-	root := it.Hash()
-	state := &nodeIteratorState{node: it.trie.root, index: -1}
-	if bytes.Compare(root, it.trie.th.placeholder()) != 0 {
+func (n *nodeIterator) init() *nodeIteratorState {
+	root := n.Hash()
+	state := &nodeIteratorState{node: n.trie.root, index: -1}
+	if bytes.Compare(root, n.trie.th.placeholder()) != 0 {
 		state.hash = root
 	}
 	return state
 }
 
-// peek creates the next state of the iterator.
-func (it *nodeIterator) peek(descend bool) (*nodeIteratorState, *int, []byte) {
-	// Initialize the iterator if we've just started.
-	if len(it.stack) == 0 {
-		state := it.init()
-		return state, nil, nil
-	}
-	if !descend {
-		// If we're skipping children, pop the current node first
-		it.pop()
-	}
-
-	// Continue iteration to the next child
-	for len(it.stack) > 0 {
-		parent := it.stack[len(it.stack)-1]
-		ancestor := parent.hash
-		if bytes.Compare(ancestor, it.trie.th.placeholder()) == 0 {
-			ancestor = parent.parent
-		}
-		state, path, ok := it.nextChild(parent, ancestor)
-		if ok {
-			if err := state.resolve(it, path); err != nil {
-				return parent, &parent.index, path, err
-			}
-			return state, &parent.index, path, nil
-		}
-		// No more child nodes, move back up.
-		it.pop()
-	}
-	return nil, nil, nil, errIteratorEnd
-}
-
-func (it *nodeIterator) nextChild(parent *nodeIteratorState, ancestor []byte) (*nodeIteratorState, []byte, bool) {
-	switch node := parent.node.(type) {
-	case *fullNode:
-		// Full node, move to the first non-nil child.
-		if child, state, path, index := findChild(node, parent.index+1, it.path, ancestor); child != nil {
-			parent.index = index - 1
-			return state, path, true
-		}
-	case *shortNode:
-		// Short node, return the pointer singleton child
-		if parent.index < 0 {
-			hash, _ := node.Val.cache()
-			state := &nodeIteratorState{
-				hash:    common.BytesToHash(hash),
-				node:    node.Val,
-				parent:  ancestor,
-				index:   -1,
-				pathlen: len(it.path),
-			}
-			path := append(it.path, node.Key...)
-			return state, path, true
-		}
-	}
-	return parent, it.path, false
-}
+//// peek creates the next state of the iterator.
+//func (n *nodeIterator) peek(descend bool) (*nodeIteratorState, *int, []byte) {
+//	if len(n.stack) == 0 {
+//		baseIt := n.init()
+//		return baseIt, nil, nil
+//	}
+//	//descend is used to skip the other siblings of the current node
+//	if !descend {
+//		n.pop()
+//	}
+//	//Continue iteration to next available nodes
+//	if len(n.stack) > 0 {
+//		parent := n.stack[len(n.stack)-1]
+//		grandParent := parent.hash
+//		//Checks if parent node has any more parents
+//		if bytes.Compare(grandParent, n.trie.th.placeholder()) == 0 {
+//			grandParent = parent.parent
+//		}
+//		//TO DO NEXT CHILD
+//	}
+//}
+//
+////nextChild obtains the nodIterator for the next node in the trie
+//func (n *nodeIterator) nextChild(parent *nodeIteratorState, ancestor []byte) (*nodeIteratorState, []byte, bool) {
+//	sidenodes, pathnodes, leafBool, values, err := n.trie.sideNodesForRoot(, n.trie.root, true)
+//	return parent, values, false
+//}
 
 //push function pushes the state nodeIteratorState into the stack that is used
 //to maintain state data along with nodeIterator
@@ -292,6 +328,7 @@ func (n nodeIterator) push(state *nodeIteratorState, parentIndex *int, path []by
 	}
 }
 
+//pop deletes the most recent value in the stack
 func (n nodeIterator) pop() {
 	last := n.stack[len(n.stack)-1]
 	n.path = n.path[:last.pathlen]
