@@ -12,7 +12,6 @@ const (
 )
 
 var defaultValue = []byte{}
-
 var errKeyAlreadyEmpty = errors.New("key already empty")
 
 // SparseMerkleTree is a Sparse Merkle tree.

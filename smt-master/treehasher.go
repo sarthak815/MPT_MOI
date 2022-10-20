@@ -76,3 +76,6 @@ func (th *treeHasher) pathSize() int {
 func (th *treeHasher) placeholder() []byte {
 	return th.zeroValue
 }
+func (th *treeHasher) nullLeaf() []byte {
+	return th.digest(th.zeroValue)
+}

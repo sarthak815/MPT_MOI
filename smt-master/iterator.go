@@ -19,7 +19,7 @@ func pop(stack [][]byte) ([]byte, [][]byte) {
 func (n *NodeIteratorSMT) Iterate() [][]byte {
 	// Get tree's root
 	root := n.Trie.Root()
-	fmt.Println("Root is ", root)
+	//fmt.Println("Root is ", root)
 	if bytes.Equal(root, n.Trie.th.placeholder()) {
 		// The tree is empty, return the default value.
 		fmt.Println("Tree is empty")
@@ -29,20 +29,30 @@ func (n *NodeIteratorSMT) Iterate() [][]byte {
 	currentHash := root
 	var key [][]byte
 	var tempKey [][]byte
-	currentData, _ := n.Trie.nodes.Get(currentHash)
-	fmt.Println("Data is:", string(currentData))
+
 	tempKey = append(tempKey, currentHash)
 	for len(tempKey) > 0 {
-		fmt.Println(len(tempKey))
+		//fmt.Println(len(tempKey))
 		var poppedKey []byte
 		poppedKey, tempKey = pop(tempKey)
+		//fmt.Println("Popped Key: ", poppedKey)
+		//fmt.Println("Len after popping: ", len(tempKey))
 		key = append(key, poppedKey)
-		leftNode, rightNode := n.Trie.th.parseNode(currentData)
+		currentData, _ := n.Trie.nodes.Get(poppedKey)
 		if n.Trie.th.isLeaf(currentData) {
+			//fmt.Println("This is a leaf node")
 			continue
 		} else {
-			tempKey = append(tempKey, rightNode)
-			tempKey = append(tempKey, leftNode)
+			//fmt.Println("Not a leaf")
+			leftNode, rightNode := n.Trie.th.parseNode(currentData)
+			if !bytes.Equal(leftNode, n.Trie.th.placeholder()) && !bytes.Equal(leftNode, n.Trie.th.nullLeaf()) {
+				tempKey = append(tempKey, leftNode)
+			}
+			if !bytes.Equal(rightNode, n.Trie.th.placeholder()) && !bytes.Equal(rightNode, n.Trie.th.nullLeaf()) {
+				tempKey = append(tempKey, rightNode)
+			}
+
+			//fmt.Println("Left Key: ", leftNode, "\nRight Key: ", rightNode)
 		}
 
 	}
@@ -51,8 +61,9 @@ func (n *NodeIteratorSMT) Iterate() [][]byte {
 
 //PrintKeys() prints all the values stored of each key
 func (n *NodeIteratorSMT) PrintKeys(key [][]byte) {
+	fmt.Println("Number of keys: ", len(key))
 	for i := 0; i < len(key); i++ {
 		currentData, _ := n.Trie.nodes.Get(key[i])
-		fmt.Println(string(currentData))
+		fmt.Println(currentData)
 	}
 }
